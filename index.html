@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brick Car Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🧱 Brick Car Lab</h1>
+    <nav>
+      <button data-nav="garage">🔧 Garage</button>
+      <button data-nav="tracks">🏁 Test tracks</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="garage" class="screen">
+      <div class="col-left">
+        <div class="panel">
+          <h2>1. Pick a part</h2>
+          <div id="palette"></div>
+          <div class="row"><b>Colour:</b> <span id="colors"></span></div>
+          <p id="tool-hint" class="hint"></p>
+        </div>
+        <div class="panel">
+          <h2>2. Wheels &amp; suspension</h2>
+          <div class="optrow"><b>Wheels</b><span id="opt-wheel"></span></div>
+          <div class="optrow"><b>Tyres</b><span id="opt-tyre"></span></div>
+          <div class="optrow"><b>Suspension</b><span id="opt-lift"></span></div>
+          <div class="optrow"><b>Axle width</b><span id="opt-width"></span></div>
+        </div>
+      </div>
+
+      <div class="col-mid">
+        <div class="panel">
+          <h2>3. Build! <small>Click to add · right-click or 🧽 to remove</small></h2>
+          <canvas id="builder-canvas"></canvas>
+          <div class="row">
+            <b>Start from:</b>
+            <button data-preset="sport">🏎️ Sport car</button>
+            <button data-preset="monster">🛻 Monster truck</button>
+            <button data-preset="tower">🗼 Wobbly tower</button>
+            <button id="btn-clear">🗑️ Empty</button>
+          </div>
+          <ul id="problems"></ul>
+          <button id="btn-to-tracks" class="big need-car">🏁 Test my car!</button>
+        </div>
+      </div>
+
+      <div class="col-right">
+        <div class="panel">
+          <h2>📊 Your car</h2>
+          <div id="stats"></div>
+        </div>
+        <div class="panel">
+          <h2>💡 Tips for <select id="tips-track"></select></h2>
+          <div id="tips"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tracks" class="screen" hidden>
+      <h2 class="center">Choose a test track</h2>
+      <div id="track-list"></div>
+    </section>
+
+    <section id="drive" class="screen" hidden>
+      <div class="drive-top">
+        <h2 id="drive-title"></h2>
+        <span class="timer">⏱️ <span id="hud-time">0.0 s</span></span>
+        <button id="btn-pause"></button>
+        <button id="btn-slow" title="Slow motion">🐢 Slow-mo</button>
+        <button id="btn-arrows" title="Show force arrows">➡️ Forces</button>
+        <button id="btn-restart">🔄 Restart</button>
+        <button id="btn-garage">🔧 Garage</button>
+      </div>
+      <p id="drive-challenge" class="challenge"></p>
+      <div class="drive-body">
+        <div class="stage">
+          <canvas id="drive-canvas" width="1000" height="520"></canvas>
+          <div id="hint-start" class="overlay-hint">Hold <b>GAS</b> (→ key) to start!<br><small>← key / BRAKE to slow down · hold BRAKE when stopped to reverse</small></div>
+          <div id="result" class="result" hidden>
+            <h2></h2>
+            <div class="stars"></div>
+            <p class="reason"></p>
+            <p class="why"></p>
+            <div class="fix"></div>
+            <div class="row">
+              <button id="res-retry" class="big">🔄 Try again</button>
+              <button id="res-garage">🔧 Change my car</button>
+              <button id="res-tracks">🏁 Other tracks</button>
+            </div>
+          </div>
+          <div class="pedals">
+            <button id="pedal-brake" class="pedal brake">BRAKE</button>
+            <button id="pedal-gas" class="pedal gas">GAS</button>
+          </div>
+        </div>
+        <div class="lab panel">
+          <div class="speedo"><span id="hud-speed">0</span><small>km/h</small></div>
+          <div class="hud-sub" id="hud-ms"></div>
+          <div class="hud-row"><b>Acceleration</b> <span id="hud-acc"></span></div>
+          <div class="hud-row"><b>Speed increment</b> <span id="hud-inc"></span></div>
+          <canvas id="speed-graph" width="320" height="120"></canvas>
+          <div class="small">Steep line = big speed increment (fast acceleration). Flat line = steady speed.</div>
+          <h3>🧪 Physics lab</h3>
+          <div id="formulas"></div>
+          <p id="drive-lesson" class="lesson"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="parts.js"></script>
+  <script src="car.js"></script>
+  <script src="tracks.js"></script>
+  <script src="topdown.js"></script>
+  <script src="tips.js"></script>
+  <script src="physics.js"></script>
+  <script src="render.js"></script>
+  <script src="builder.js"></script>
+  <script src="drive.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
