@@ -114,7 +114,7 @@
     var s = sim.s;
     var px = cam.scale;
     var sx = function (x) { return (x - cam.x) * px + W / 2; };
-    var sy = function (y) { return H * 0.62 - (y - cam.y) * px; };
+    var sy = function (y) { return H * 0.5 - (y - cam.y) * px; };
 
     var sky = ctx.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, '#7ec8f2'); sky.addColorStop(1, '#d9f1ff');

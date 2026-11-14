@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Brick Car Lab">
   <title>Brick Car Lab</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -80,7 +83,7 @@
       <div class="drive-body">
         <div class="stage">
           <canvas id="drive-canvas" width="1000" height="520"></canvas>
-          <div id="hint-start" class="overlay-hint">Hold <b>GAS</b> (→ key) to start!<br><small>← key / BRAKE to slow down · hold BRAKE when stopped to reverse</small></div>
+          <div id="hint-start" class="overlay-hint">Hold <b>GAS</b> to start!<br><small>BRAKE slows down · hold BRAKE when stopped to reverse · keys → ←</small></div>
           <div id="result" class="result" hidden>
             <h2></h2>
             <div class="stars"></div>

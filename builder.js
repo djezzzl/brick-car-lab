@@ -23,6 +23,11 @@
     this.buildOptions();
     this.bindCanvas();
     var self = this;
+    // Tap a stat to read what it means (there is no mouse hover on a tablet).
+    root.querySelector('#stats').addEventListener('click', function (e) {
+      var st = e.target.closest('.stat');
+      if (st) { self.openStat = st.querySelector('.l').textContent === self.openStat ? null : st.querySelector('.l').textContent; self.renderStats(); }
+    });
     root.querySelector('#tips-track').addEventListener('change', function (e) { self.tipsTrack = e.target.value; self.refresh(); });
     root.querySelectorAll('[data-preset]').forEach(function (b) {
       b.addEventListener('click', function () { self.setDesign(B.PRESETS[b.dataset.preset]()); });
@@ -132,7 +137,7 @@
     c.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     c.addEventListener('pointerdown', function (e) {
       down = true; erase = e.button === 2 || self.tool.type === 'eraser';
-      c.setPointerCapture(e.pointerId);
+      try { c.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       self.act(self.cellFromEvent(e), erase);
     });
     c.addEventListener('pointermove', function (e) {
@@ -228,8 +233,8 @@
   P.renderStats = function () {
     var s = this.stats, el = this.root.querySelector('#stats');
     function row(label, value, frac, tip, color) {
-      return '<div class="stat" title="' + tip + '"><span class="l">' + label + '</span><span class="v">' + value + '</span>' +
-        '<span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%;background:' + (color || '#0055bf') + '"></i></span></div>';
+      return '<div class="stat" title="' + tip + '"><span class="l">' + label + ' <span class="q">ⓘ</span></span><span class="v">' + value + '</span>' +
+        '<span class="bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%;background:' + (color || '#0055bf') + '"></i></span><span class="d">' + tip + '</span></div>';
     }
     var html = '';
     html += row('⚖️ Weight', Math.round(s.mass) + ' kg', s.mass / 2500, 'Heavier cars are harder to speed up AND to stop.', '#6b7178');
@@ -243,6 +248,8 @@
     html += row('🤸 Tip-over limit', s.tipLimitG.toFixed(2) + ' g', s.tipLimitG / 1.5, 'How hard you can turn before tipping: (half width) ÷ (centre of mass height).', '#8e24aa');
     html += row('🛞 Grip (road)', s.gripRoad.toFixed(2), s.gripRoad, 'Tyre friction. Limits push, braking and turning.', '#1b2a34');
     el.innerHTML = html;
+    var open = this.openStat;
+    el.querySelectorAll('.stat').forEach(function (st) { st.classList.toggle('open', st.querySelector('.l').textContent === open); });
     var pr = this.root.querySelector('#problems');
     pr.innerHTML = this.problems.length ? this.problems.map(function (p) { return '<li>' + p + '</li>'; }).join('') : '<li class="ok">✅ Your car is ready to drive!</li>';
   };

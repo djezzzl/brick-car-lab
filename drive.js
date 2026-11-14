@@ -7,6 +7,9 @@
     this.onExit = opts.onExit;
     this.canvas = root.querySelector('#drive-canvas');
     this.ctx = this.canvas.getContext('2d');
+    var self0 = this;
+    window.addEventListener('resize', function () { self0.resize(); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { self0.resize(); }, 300); });
     this.graph = root.querySelector('#speed-graph');
     this.gctx = this.graph.getContext('2d');
     this.input = { gas: false, brake: false };
@@ -43,6 +46,7 @@
     this.root.querySelector('#result').hidden = true;
     this.root.querySelector('#hint-start').hidden = false;
     this.updateButtons();
+    this.resize();
     if (!this.running) {
       this.running = true;
       this.last = performance.now();
@@ -57,6 +61,18 @@
 
   P.stop = function () { this.running = false; };
 
+  // Fit the drive canvas to the screen (so pedals and road are visible without scrolling) and keep it sharp on retina screens.
+  P.resize = function () {
+    var c = this.canvas, cssW = c.clientWidth;
+    if (!cssW) return;
+    var top = c.getBoundingClientRect().top + window.scrollY;
+    var cssH = Math.round(Math.max(260, Math.min(cssW * 0.6, window.innerHeight - top - 12)));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    c.style.height = cssH + 'px';
+    c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * dpr);
+    this.dpr = dpr; this.cssW = cssW; this.cssH = cssH;
+  };
+
   P.bindControls = function () {
     var self = this;
     var keys = { ArrowRight: 'gas', ArrowUp: 'gas', d: 'gas', w: 'gas', ArrowLeft: 'brake', ArrowDown: 'brake', a: 'brake', s: 'brake' };
@@ -69,8 +85,10 @@
     window.addEventListener('keyup', function (e) { if (keys[e.key]) self.input[keys[e.key]] = false; });
     [['#pedal-gas', 'gas'], ['#pedal-brake', 'brake']].forEach(function (p) {
       var el = self.root.querySelector(p[0]);
-      el.addEventListener('pointerdown', function (e) { self.input[p[1]] = true; el.setPointerCapture(e.pointerId); el.classList.add('down'); });
-      ['pointerup', 'pointercancel'].forEach(function (ev) { el.addEventListener(ev, function () { self.input[p[1]] = false; el.classList.remove('down'); }); });
+      el.addEventListener('pointerdown', function (e) { e.preventDefault(); self.input[p[1]] = true; try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } el.classList.add('down'); });
+      el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) { el.addEventListener(ev, function () { self.input[p[1]] = false; el.classList.remove('down'); }); });
     });
     this.root.querySelector('#btn-pause').addEventListener('click', function () { self.togglePause(); });
     this.root.querySelector('#btn-slow').addEventListener('click', function () { self.slow = !self.slow; self.updateButtons(); });
@@ -140,7 +158,8 @@
   };
 
   P.draw = function () {
-    var c = this.canvas, ctx = this.ctx, W = c.width, H = c.height, sim = this.sim;
+    var ctx = this.ctx, W = this.cssW || this.canvas.width, H = this.cssH || this.canvas.height, sim = this.sim;
+    ctx.setTransform(this.dpr || 1, 0, 0, this.dpr || 1, 0, 0);
     if (this.track.kind === 'top') { B.renderEight(ctx, W, H, sim, this.design, { arrows: this.arrows }); return; }
     var v = sim.speed();
     var target = 58 / (1 + v / 35) * Math.min(1.2, 2.2 / Math.max(1.6, this.stats.height));
