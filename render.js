@@ -1,4 +1,4 @@
-// Drawing: LEGO-style car, side-view world with force arrows, and the Death 8 map.
+// Drawing: LEGO-style car, side-view world with force arrows, and car thumbnails.
 (function (B) {
   function shade(hex, amt) {
     var n = parseInt(hex.slice(1), 16);
@@ -8,6 +8,8 @@
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
   B.shade = shade;
+
+  function hex(c) { return c && c.charAt(0) === '#' ? c : '#888888'; }
 
   // Draws the brick body in design metres (y up). Caller sets the transform.
   B.drawBody = function (ctx, design, px) {
@@ -26,11 +28,23 @@
         ctx.strokeRect(x, y + S * 0.65, w, S * 0.25);
         return;
       }
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, w, S);
-      ctx.fillStyle = shade(color.charAt(0) === '#' ? color : '#888888', 30);
+      if (p.type === 'driver') { drawDriver(ctx, x, y, S, p.color); return; }
+      var shape = p.shape || 'block';
+      ctx.beginPath();
+      B.pieceOutline(p).forEach(function (q, i) { var X = x + q[0] * S, Y = y + q[1] * S; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); });
+      ctx.closePath();
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = shade(hex(color), -80); ctx.stroke();
+      if (shape === 'round') {
+        ctx.fillStyle = shade(hex(color), 40);
+        ctx.beginPath(); ctx.arc(x + S * 0.38, y + S * 0.62, S * 0.12, 0, Math.PI * 2); ctx.fill();
+      }
+      if (shape !== 'block') {
+        if (shape === 'wedge' && (p.rot === 2 || p.rot === 3)) studs(p, x, y, color);
+        return;
+      }
+      ctx.fillStyle = shade(hex(color), 30);
       ctx.fillRect(x, y + S * 0.8, w, S * 0.2);
-      ctx.strokeStyle = shade(color.charAt(0) === '#' ? color : '#888888', -80);
       ctx.strokeRect(x, y, w, S);
       if (p.type === 'window') {
         ctx.strokeStyle = 'rgba(255,255,255,0.8)';
@@ -52,16 +66,36 @@
           ctx.fillRect(x - S * 0.15, y + S * 0.1, S * 0.15, S * 0.12);
         }
       }
-      // studs on top where nothing sits above
+      studs(p, x, y, color);
+    });
+
+    // Studs on top where nothing sits above.
+    function studs(p, x, y, color) {
       for (var k = 0; k < p.len; k++) {
         if (occupied[(p.col + k) + ',' + (p.row + 1)]) continue;
-        ctx.fillStyle = p.type === 'window' ? '#b9e4f8' : shade(color.charAt(0) === '#' ? color : '#888888', 10);
+        ctx.fillStyle = p.type === 'window' ? '#b9e4f8' : shade(hex(color), 10);
         ctx.fillRect(x + k * S + S * 0.25, y + S, S * 0.5, S * 0.14);
-        ctx.strokeStyle = shade(color.charAt(0) === '#' ? color : '#888888', -80);
+        ctx.strokeStyle = shade(hex(color), -80);
         ctx.strokeRect(x + k * S + S * 0.25, y + S, S * 0.5, S * 0.14);
       }
-    });
+    }
   };
+
+  // A minifig head with a helmet, looking forward (+x).
+  function drawDriver(ctx, x, y, S, helmet) {
+    var cx = x + S * 0.5, cy = y + S * 0.42, r = S * 0.3;
+    ctx.fillStyle = '#f2cd37'; ctx.strokeStyle = '#7a5c00';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(cx + r * 0.45, cy + r * 0.15, r * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = r * 0.12;
+    ctx.beginPath(); ctx.arc(cx + r * 0.3, cy - r * 0.15, r * 0.35, -Math.PI * 0.45, -Math.PI * 0.05); ctx.stroke();
+    ctx.fillStyle = helmet || '#d01012';
+    ctx.beginPath(); ctx.arc(cx, cy + r * 0.05, r * 1.08, Math.PI * 0.05, Math.PI * 0.95); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(160,220,255,0.85)';
+    ctx.fillRect(cx + r * 0.25, cy + r * 0.25, r * 0.8, r * 0.25);
+    ctx.fillStyle = '#555'; ctx.fillRect(cx - r * 0.35, y, r * 0.7, S * 0.12);
+  }
 
   B.drawWheel = function (ctx, cx, cy, r, spin, tyre, px) {
     ctx.save();
@@ -116,23 +150,48 @@
     var sx = function (x) { return (x - cam.x) * px + W / 2; };
     var sy = function (y) { return H * 0.5 - (y - cam.y) * px; };
 
+    var th = track.theme || { sky: ['#7ec8f2', '#d9f1ff'], hills: '#b5e0b0', ground: '#6d6f73', edge: '#3c3d40' };
     var sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#7ec8f2'); sky.addColorStop(1, '#d9f1ff');
+    sky.addColorStop(0, th.sky[0]); sky.addColorStop(1, th.sky[1]);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
     // parallax hills
-    ctx.fillStyle = '#b5e0b0';
+    ctx.fillStyle = th.hills;
     ctx.beginPath(); ctx.moveTo(0, H);
     for (var hx = 0; hx <= W; hx += 20) ctx.lineTo(hx, H * 0.55 - 40 * Math.sin((hx + cam.x * px * 0.2) / 140) - 20);
     ctx.lineTo(W, H); ctx.fill();
 
     var x0 = cam.x - W / 2 / px - 1, x1 = cam.x + W / 2 / px + 1;
-    var groundColor = { road: '#6d6f73', rough: '#8d6e4f', dirt: '#a0703f' }[track.surface] || '#777';
-    ctx.fillStyle = groundColor;
+    // lava / water / dark canyon inside each gap
+    if (track.hazard) {
+      var lvl = sy(track.hazard === 'canyon' ? 0.5 : track.hazardLevel);
+      var t = Date.now() / 1000;
+      (track.gaps || []).forEach(function (g) {
+        var gx0 = sx(g[0]), gx1 = sx(g[1]);
+        if (gx1 < 0 || gx0 > W) return;
+        ctx.fillStyle = { water: '#1e88e5', lava: '#ff5722', canyon: '#4e342e' }[track.hazard];
+        ctx.fillRect(gx0, lvl, gx1 - gx0, H - lvl);
+        if (track.hazard === 'canyon') return;
+        ctx.save(); ctx.beginPath(); ctx.rect(gx0, lvl - 12, gx1 - gx0, H); ctx.clip();
+        ctx.fillStyle = track.hazard === 'lava' ? '#ffc107' : 'rgba(255,255,255,0.7)';
+        for (var wx = gx0 - 40; wx < gx1 + 40; wx += 30) {
+          ctx.beginPath(); ctx.arc(wx + (t * 25) % 30, lvl + 3 + 3 * Math.sin(t * 3 + wx), 6, Math.PI, 0); ctx.fill();
+        }
+        if (track.hazard === 'water') {
+          for (var k = 0; k < 2; k++) {
+            var fx = sx(g[0] + (g[1] - g[0]) * (0.3 + 0.4 * k) + 2.5 * Math.sin(t * (0.8 + k) + k));
+            ctx.fillStyle = '#546e7a';
+            ctx.beginPath(); ctx.moveTo(fx - 0.6 * px, lvl + 2); ctx.lineTo(fx + 0.1 * px, lvl - 1.0 * px); ctx.lineTo(fx + 0.5 * px, lvl + 2); ctx.closePath(); ctx.fill();
+          }
+        }
+        ctx.restore();
+      });
+    }
+    ctx.fillStyle = th.ground;
     ctx.beginPath(); ctx.moveTo(sx(x0), H);
     var step = Math.max(0.05, 2 / px);
     for (var x = x0; x <= x1; x += step) ctx.lineTo(sx(x), sy(sim.ground(x)));
     ctx.lineTo(sx(x1), H); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = track.surface === 'road' ? '#3c3d40' : '#5b8a3a';
+    ctx.strokeStyle = th.edge;
     ctx.lineWidth = 4;
     ctx.beginPath();
     for (x = x0; x <= x1; x += step) { if (x === x0) ctx.moveTo(sx(x), sy(sim.ground(x))); else ctx.lineTo(sx(x), sy(sim.ground(x))); }
@@ -160,23 +219,16 @@
       }
       ctx.fillStyle = '#444'; ctx.fillRect(fx - 3, fy - 100, 3, 100);
     }
-    if (track.id === 'stop') {
-      ctx.fillStyle = '#f2cd37'; ctx.fillRect(sx(track.lineX) - 3, sy(0) - 2, 6, 10);
-      pole(track.lineX, '#f2cd37', '40+!', 80);
-      ctx.fillStyle = 'rgba(40,180,70,0.35)';
-      ctx.fillRect(sx(track.zoneA), sy(0) - 120, (track.zoneB - track.zoneA) * px, 120);
-      ctx.strokeStyle = '#1e7b34'; ctx.lineWidth = 3;
-      ctx.strokeRect(sx(track.zoneA), sy(0) - 120, (track.zoneB - track.zoneA) * px, 120);
-      ctx.fillStyle = '#a33'; ctx.fillRect(sx(track.wallX), sy(0) - 3 * px, 1.2 * px, 3 * px);
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui'; ctx.fillText('WALL', sx(track.wallX) + 4, sy(0) - 1.5 * px);
-      if (opts.brakeX != null) {
-        var bx = sx(opts.brakeX), by = sy(0);
-        ctx.strokeStyle = '#8e24aa'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]);
-        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by - 150); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#8e24aa'; ctx.fillRect(bx, by - 150, 92, 20);
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText('stop here?', bx + 6, by - 136);
+    // booster pads: glowing arrows on the road
+    (track.boosters || []).forEach(function (bz) {
+      if (bz[1] < x0 || bz[0] > x1) return;
+      var glow = 0.6 + 0.4 * Math.sin(Date.now() / 120);
+      for (var bx = bz[0]; bx < bz[1]; bx += 1.6) {
+        var gx = sx(bx), gy = sy(sim.ground(bx));
+        ctx.fillStyle = 'rgba(255,152,0,' + glow + ')';
+        ctx.beginPath(); ctx.moveTo(gx, gy - 2); ctx.lineTo(gx + 0.8 * px, gy - 2); ctx.lineTo(gx + 1.3 * px, gy - 0.25 * px - 2); ctx.lineTo(gx + 0.8 * px, gy - 0.5 * px - 2); ctx.lineTo(gx, gy - 0.5 * px - 2); ctx.lineTo(gx + 0.5 * px, gy - 0.25 * px - 2); ctx.closePath(); ctx.fill();
       }
-    }
+    });
 
     // car
     ctx.save();
@@ -192,7 +244,7 @@
     });
     B.drawBody(ctx, design, px);
     sim.wheels.forEach(function (w) {
-      B.drawWheel(ctx, w.ax + s.comX, w.ay + s.comY - w.len, s.wheelR, w.spin, design.tyre, px);
+      B.drawWheel(ctx, w.ax + s.comX, w.ay + s.comY - w.len, w.r, w.spin, design.tyre, px);
     });
     // centre of mass marker
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 0.03;
@@ -214,69 +266,26 @@
       arrow(ctx, cx, cy + 16, -dir * clamp(f.drag * unit) * fx2, -dir * clamp(f.drag * unit) * fy2, '#d93025', f.drag > 200 ? 'air ' + kN(f.drag) : '');
       arrow(ctx, cx, cy + 32, -dir * clamp(f.brake * unit) * fx2, -dir * clamp(f.brake * unit) * fy2, '#f29900', f.brake > 50 ? 'brake ' + kN(f.brake) : '');
       if (Math.abs(f.gravity) > 300) arrow(ctx, cx, cy + 48, -clamp(f.gravity * unit) * fx2, -clamp(f.gravity * unit) * fy2, '#1a73e8', 'gravity ' + kN(Math.abs(f.gravity)));
+      if (f.booster > 50) arrow(ctx, cx, cy - 16, clamp(f.booster * unit) * fx2, clamp(f.booster * unit) * fy2, '#ff9800', 'BOOST ' + kN(f.booster));
       if (f.scrape > 300) arrow(ctx, cx, cy + 64, -dir * clamp(f.scrape * unit) * fx2, -dir * clamp(f.scrape * unit) * fy2, '#795548', 'scrape ' + kN(f.scrape));
     }
   };
 
-  B.renderEight = function (ctx, W, H, sim, design, opts) {
-    var path = B.EIGHT_PATH;
-    ctx.fillStyle = '#5fa85a'; ctx.fillRect(0, 0, W, H);
-    var scale = Math.min(W / 135, H / 52);
-    var ox = W / 2, oy = H / 2;
-    var tx = function (x) { return ox + x * scale; }, ty = function (y) { return oy - y * scale; };
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 9.5 * scale;
-    ctx.beginPath();
-    path.pts.forEach(function (p, i) { if (i === 0) ctx.moveTo(tx(p.x), ty(p.y)); else ctx.lineTo(tx(p.x), ty(p.y)); });
-    ctx.closePath(); ctx.stroke();
-    ctx.strokeStyle = '#555'; ctx.lineWidth = 8 * scale; ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.setLineDash([12, 12]); ctx.stroke(); ctx.setLineDash([]);
-    // danger crossing (flashes when both cars are heading there at the same time)
-    var danger = sim.crossingDanger();
-    ctx.fillStyle = danger && Math.floor(Date.now() / 200) % 2 ? 'rgba(217,48,37,0.85)' : 'rgba(217,48,37,0.35)';
-    ctx.beginPath(); ctx.arc(tx(0), ty(0), 6 * scale, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui';
-    ctx.fillText(danger ? '⚠ WATCH OUT!' : '⚠ crossing', tx(0) + 8 * scale, ty(0) - 6 * scale);
-    // start line
-    ctx.fillStyle = '#fff'; ctx.fillRect(tx(path.pts[0].x) - 4 * scale, ty(0) - 1, 8 * scale, 3);
-
-    function car(pos, color, spin, tipped) {
-      var p = B.eightAt(pos);
-      ctx.save();
-      ctx.translate(tx(p.x), ty(p.y));
-      ctx.rotate(-p.heading + spin);
-      var len = Math.max(design ? sim.s.length : 4, 3) * scale, wid = (sim.s.width) * scale;
-      if (color !== 'ghost') {
-        ctx.fillStyle = '#111';
-        [[-0.35, -0.5], [0.35, -0.5], [-0.35, 0.5], [0.35, 0.5]].forEach(function (k) { ctx.fillRect(k[0] * len - 0.3 * scale, k[1] * wid - 0.25 * scale, 0.6 * scale, 0.5 * scale); });
-        ctx.fillStyle = tipped ? '#555' : (B.mainColor(design) || '#d01012');
-        ctx.fillRect(-len / 2, -wid / 2, len, wid);
-        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(len * 0.1, -wid / 2 + 2, len * 0.15, wid - 4);
-      } else {
-        ctx.fillStyle = '#ffeb3b'; ctx.fillRect(-2.2 * scale, -0.9 * scale, 4.4 * scale, 1.8 * scale);
-        ctx.fillStyle = '#333'; ctx.fillRect(0.6 * scale, -0.8 * scale, 0.8 * scale, 1.6 * scale);
-      }
-      ctx.restore();
-    }
-    car(sim.ghostPos, 'ghost', 0);
-    car(sim.pos, 'me', sim.spinTime > 0 ? sim.spinTime * 9 : 0, sim.tipped);
-
-    if (opts.arrows) {
-      var p = B.eightAt(sim.pos);
-      var nx = -Math.sin(p.heading), ny = Math.cos(p.heading);
-      // point the sideways arrow towards the inside of the turn
-      var ahead = B.eightAt(sim.pos + 3);
-      var turn = Math.sign(Math.sin(ahead.heading - p.heading)) || 1;
-      var len = Math.min(140, sim.aLat / B.G * 70);
-      arrow(ctx, tx(p.x), ty(p.y), nx * turn * len, -ny * turn * len, '#8e24aa', len > 10 ? 'turn pull ' + (sim.aLat / B.G).toFixed(2) + ' g' : '');
-    }
-  };
-
-  B.mainColor = function (design) {
-    var counts = {};
-    design.pieces.forEach(function (p) { if (p.color) counts[p.color] = (counts[p.color] || 0) + p.len; });
-    var best = null;
-    Object.keys(counts).forEach(function (c) { if (!best || counts[c] > counts[best]) best = c; });
-    return best;
+  // Small picture of a car (for the record book). Fits the whole car into the canvas.
+  B.drawCarThumb = function (canvas, design) {
+    var ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height, st = B.computeStats(design);
+    ctx.clearRect(0, 0, W, H);
+    var left = st.minX, right = st.maxX;
+    st.wheels.forEach(function (w) { left = Math.min(left, w.x - w.r); right = Math.max(right, w.x + w.r); });
+    var top = st.clearance + st.bodyTop + 0.2;
+    var px = Math.min((W - 6) / Math.max(0.5, right - left), (H - 6) / top);
+    ctx.save();
+    ctx.translate((W - (right - left) * px) / 2 - left * px, H - 3);
+    ctx.scale(px, -px);
+    ctx.fillStyle = '#9aa0a6'; ctx.fillRect(left - 1, -0.05, right - left + 2, 0.05);
+    ctx.translate(0, st.clearance);
+    B.drawBody(ctx, design, px);
+    st.wheels.forEach(function (w) { B.drawWheel(ctx, w.x, w.y, w.r, 0, design.tyre, px); });
+    ctx.restore();
   };
 })(window.BCL);

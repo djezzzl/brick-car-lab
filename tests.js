@@ -87,34 +87,88 @@
     assert(slick < hill.finishX && knobbly > hill.finishX, 'slick reached ' + slick.toFixed(0) + ', knobbly ' + knobbly.toFixed(0));
   });
 
-  test('Death 8: tower tips, sport car only slides', function () {
-    var tower = new B.EightSim(B.computeStats(B.PRESETS.tower()));
-    var sport = new B.EightSim(B.computeStats(B.PRESETS.sport()));
-    for (var t = 0; t < 20; t += 1 / 240) {
-      if (!tower.tipped) tower.step(1 / 240, { gas: true, brake: false });
-      sport.step(1 / 240, { gas: true, brake: false });
-    }
-    assert(tower.tipped, 'tower should tip');
-    assert(!sport.tipped && sport.slides > 0, 'sport should slide, not tip');
+  test('several engines add power and weight; every wheel is a pair', function () {
+    var h = B.computeStats(B.PRESETS.hotrod()), t = B.computeStats(B.PRESETS.truck());
+    assert(h.engines === 2 && h.power === 240000, 'hot rod engines ' + h.engines + ' power ' + h.power);
+    assert(t.wheelCount === 6, 'truck wheels ' + t.wheelCount);
+    var one = B.PRESETS.hotrod();
+    one.pieces = one.pieces.filter(function (p) { return p.engine !== 'normal'; });
+    assert(B.computeStats(one).mass < h.mass, 'second engine adds weight');
+  });
+
+  test('a pointy wedge nose lowers air drag', function () {
+    var pointy = B.computeStats(B.PRESETS.sport());
+    var d = B.PRESETS.sport();
+    d.pieces.forEach(function (p) { if (p.shape === 'wedge') delete p.shape; });
+    var boxy = B.computeStats(d);
+    assert(pointy.cd < boxy.cd && pointy.nose === 1, 'pointy ' + pointy.cd + ' boxy ' + boxy.cd);
+  });
+
+  test('wheels need a brick above and cannot overlap', function () {
+    var d = B.PRESETS.sport();
+    assert(!B.placeWheel(d, 13, 'small'), 'no brick at col 13');
+    assert(!B.placeWheel(d, 2, 'small'), 'too close to the wheel at col 1');
+    assert(B.placeWheel(d, 5, 'medium') && d.wheels.length === 3, 'third wheel placed');
+    assert(B.removeWheelAt(d, 5) && d.wheels.length === 2, 'wheel removed');
+    d.wheels = [d.wheels[0]];
+    assert(/2 wheels/.test(B.validate(d).join(' ')), 'needs 2 wheels');
+  });
+
+  test('mixed wheel sizes and six wheels park level and steady', function () {
+    ['hotrod', 'truck'].forEach(function (name) {
+      var sim = run(B.PRESETS[name](), flatTrack(), 3, { gas: false, brake: false });
+      assert(sim.speed() < 0.05 && Math.abs(sim.a) < 0.03, name + ' speed ' + sim.speed().toFixed(3) + ' angle ' + sim.a.toFixed(3));
+      assert(sim.wheels.every(function (w) { return w.contact; }), name + ' all wheels on the ground');
+    });
+  });
+
+  test('old saved cars (one wheel size) are upgraded', function () {
+    var d = B.migrate({ pieces: [{ type: 'plastic', col: 2, row: 0, len: 4 }, { type: 'engine', engine: 'normal', col: 2, row: 1, len: 2 }], wheel: 'big', tyre: 'slick', lift: 'low', width: 'wide' });
+    assert(d.wheels.length === 2 && d.wheels[0].col === 2 && d.wheels[1].col === 5 && d.wheels[0].size === 'big', JSON.stringify(d.wheels));
+    assert(B.validate(d).length === 0, B.validate(d).join(' '));
+  });
+
+  test('no track fails a car that just sits at the start', function () {
+    B.TRACKS.forEach(function (track) {
+      track.ground = track.ground || track.build();
+      var sim = new B.SideSim(B.computeStats(B.PRESETS.sport()), track), r = B.newRun();
+      for (var i = 0; i < 240; i++) { sim.step(1 / 240, { gas: false, brake: false }); B.updateRun(r, sim, 1 / 240); }
+      var res = track.check(sim, r);
+      assert(!res, track.id + ': ' + (res && res.reason));
+    });
+  });
+
+  test('record book keeps the fastest run first', function () {
+    var key = B.Records.key;
+    B.Records.key = 'bcl.records.test';
+    try {
+      B.Records.clear('speed');
+      var d = B.PRESETS.sport(), s = B.computeStats(d);
+      B.Records.add('speed', d, s, { time: 12, flips: 0 }, 2);
+      var r = B.Records.add('speed', d, s, { time: 9.5, flips: 1 }, 3);
+      assert(r.rank === 1 && B.Records.best('speed').time === 9.5 && B.Records.forTrack('speed').length === 2, 'rank ' + r.rank);
+      B.Records.clear('speed');
+    } finally { B.Records.key = key; }
   });
 
   // Not assertions: how each preset does on each track with a simple driver (for tuning).
   function survey() {
     var rows = [];
-    ['sport', 'monster', 'tower'].forEach(function (name) {
-      B.TRACKS.filter(function (t) { return t.kind === 'side'; }).forEach(function (track) {
+    Object.keys(B.PRESETS).forEach(function (name) {
+      B.TRACKS.forEach(function (track) {
         track.ground = track.ground || track.build();
         var sim = new B.SideSim(B.computeStats(B.PRESETS[name]()), track);
-        var r = B.newRun(), res = null, braking = false;
+        var r = B.newRun(), res = null;
         for (var i = 0; i < 240 * 90 && !res; i++) {
           var input = { gas: true, brake: false };
-          if (track.id === 'stop' && sim.maxX() > track.lineX) {
-            var stopAt = sim.maxX() + sim.speed() * sim.speed() / (2 * sim.s.brakeDecel);
-            if (stopAt > (track.zoneA + track.zoneB) / 2) braking = true;
-            input = { gas: !braking, brake: braking };
-          }
           if (track.id === 'bad' && sim.forwardSpeed() > 9) input.gas = false;
-          if (track.id === 'stop' && sim.forwardSpeed() > 22) input.gas = false;
+          // In the air, keep the car roughly parallel to the ground below (like a player would).
+          if (sim.airborne) {
+            var want = Math.atan(sim.slope(sim.x));
+            if (sim.a + sim.w * 0.4 > want + 0.15) input = { gas: false, brake: true };
+            else if (sim.a + sim.w * 0.4 < want - 0.15) input = { gas: true, brake: false };
+            else input = { gas: false, brake: false };
+          }
           sim.step(1 / 240, input);
           B.updateRun(r, sim, 1 / 240);
           res = track.check(sim, r);
@@ -122,18 +176,6 @@
         }
         rows.push(name + ' @ ' + track.id + ': ' + (res ? (res.win ? 'WIN ' : 'FAIL ') + res.reason : 'no result') + ' (x=' + sim.x.toFixed(1) + ')');
       });
-      var eight = new B.EightSim(B.computeStats(B.PRESETS[name]()));
-      var t8 = B.trackById('eight'), r8 = B.newRun(), res8 = null;
-      for (var j = 0; j < 240 * 120 && !res8; j++) {
-        var kmax = 0;
-        for (var d = 0; d <= eight.v * eight.v / 16 + 2; d += 1) kmax = Math.max(kmax, B.eightAt(eight.pos + d).k);
-        var safe = Math.sqrt(0.85 * Math.min(eight.slideLimit(), eight.tipLimit()) / Math.max(kmax, 1e-4));
-        var wait = eight.crossingDanger(), first = eight.crossingETA().me < eight.crossingETA().other;
-        eight.step(1 / 240, { gas: (wait && first) || (!wait && eight.v < safe), brake: (wait && !first) || eight.v > safe + 0.5 });
-        B.updateRun(r8, eight, 1 / 240);
-        res8 = t8.check(eight, r8);
-      }
-      rows.push(name + ' @ eight (careful driver): ' + (res8 ? (res8.win ? 'WIN ' : 'FAIL ') + res8.reason : 'no result'));
     });
     return rows;
   }

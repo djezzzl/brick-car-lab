@@ -111,3 +111,33 @@ h2 small { font-weight: normal; color: #666; font-size: 13px; }
   .drive-top button { padding: 4px 10px; }
   .result { inset: 12px 12px auto 12px; max-height: calc(100% - 24px); overflow: auto; }
 }
+
+/* Wheels, wedges, names */
+#wheel-tools { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.wheel-tool canvas { width: 44px; height: 44px; }
+#btn-rotate { font-size: 14px; margin-left: 8px; }
+#car-name { font: inherit; font-size: 16px; padding: 6px 10px; border: 2px solid #1b2a34; border-radius: 10px; width: 220px; }
+
+/* Track cards */
+.card { position: relative; }
+.card .level { position: absolute; top: 14px; right: 14px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px; color: #fff; }
+.level-1 .level { background: #1e9e3a; } .level-2 .level { background: #f29900; } .level-3 .level { background: #d93025; }
+.card .best { font-size: 15px; background: #fff8e1; padding: 6px 8px; border-radius: 8px; }
+
+/* Results and energy bar */
+.result .record { font-size: 18px; font-weight: 700; color: #b06000; }
+.energy { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: #eef1f4; margin: 4px 0; }
+.energy i { display: block; height: 100%; }
+.energy .pe { background: #1a73e8; } .energy .ke { background: #d93025; }
+
+/* Record book */
+.modal { position: fixed; inset: 0; background: rgba(27, 42, 52, 0.55); z-index: 10; display: flex; align-items: flex-start; justify-content: center; padding: 20px; overflow: auto; }
+.modal-box { background: #fff; border: 4px solid #1b2a34; border-radius: 18px; padding: 16px 20px; max-width: 1000px; width: 100%; box-shadow: 0 8px 0 #1b2a34; }
+.records { width: 100%; border-collapse: collapse; font-size: 14px; }
+.records th { text-align: left; border-bottom: 2px solid #1b2a34; padding: 4px 6px; }
+.records td { border-bottom: 1px dashed #ccd3d8; padding: 4px 6px; vertical-align: middle; }
+.records .medal { font-size: 22px; text-align: center; }
+.records .car canvas { width: 140px; height: 64px; display: block; }
+.records .car div { font-weight: 700; }
+.empty { font-size: 18px; text-align: center; padding: 20px; }
+@media (max-width: 800px) { .records th:nth-child(5), .records td:nth-child(5), .records th:nth-child(9), .records td:nth-child(9) { display: none; } }

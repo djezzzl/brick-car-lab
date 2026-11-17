@@ -16,18 +16,6 @@
         { test: function (s) { return s.topSpeed * 3.6 >= 150; }, ok: function (s) { return 'Top speed about ' + kmh(s.topSpeed) + ' km/h.'; }, bad: function (s) { return 'Top speed only about ' + kmh(s.topSpeed) + ' km/h.'; } }
       ]
     },
-    stop: {
-      caveats: [
-        'All cars have the same brakes. A heavy car has more momentum, so the same brakes slow it down less each second.',
-        'Grippy tyres let you brake harder before they skid.',
-        'Watch the purple flag while driving: it shows where you would stop if you braked right now.'
-      ],
-      checks: [
-        { test: function (s) { return s.brakeDecel >= 8; }, ok: function (s) { return 'Brakes slow you by ' + s.brakeDecel.toFixed(1) + ' m/s every second.'; }, bad: function (s) { return 'Heavy car: brakes only slow you by ' + s.brakeDecel.toFixed(1) + ' m/s each second. Use lighter bricks.'; } },
-        { test: function (s) { return s.tipLimitG >= 0.8; }, ok: function () { return 'Low enough not to nose-dive too much.'; }, bad: function () { return 'Tall car: it will lean forward a lot when braking.'; } },
-        { test: function (s) { return s.zeroTo100 != null && s.zeroTo100 < 10; }, ok: function () { return 'Enough power to reach 80 km/h for ⭐⭐⭐.'; }, bad: function () { return 'Slow engine: you may not reach 80 km/h for 3 stars.'; } }
-      ]
-    },
     bad: {
       caveats: [
         'Clearance = space under the car. A rock taller than that will scrape the floor.',
@@ -37,7 +25,7 @@
       ],
       checks: [
         { test: function (s) { return s.clearance >= 0.4; }, ok: function (s) { return 'Clearance ' + cm(s.clearance) + ' cm – rocks pass under you.'; }, bad: function (s) { return 'Clearance only ' + cm(s.clearance) + ' cm – the 55 cm rock will scrape you. Try bigger wheels or higher suspension.'; } },
-        { test: function (s) { return s.wheelR >= 0.5; }, ok: function (s) { return 'Wheels ' + cm(s.wheelR) + ' cm radius roll over the 50 cm step.'; }, bad: function (s) { return 'Wheels are small (' + cm(s.wheelR) + ' cm). The 50 cm step is a wall for them.'; } },
+        { test: function (s) { return s.wheelRMin >= 0.5; }, ok: function (s) { return 'Even your smallest wheels (' + cm(s.wheelRMin) + ' cm radius) roll over the 50 cm step.'; }, bad: function (s) { return 'Your smallest wheels are ' + cm(s.wheelRMin) + ' cm radius. The 50 cm step is a wall for them – EVERY wheel has to get over it.'; } },
         { test: function (s) { return s.grip.rough >= 0.9; }, ok: function () { return 'Off-road tyres – good grip on rocks.'; }, bad: function () { return 'Slick tyres slip on rough ground. Use knobbly tyres.'; } },
         { test: function (s) { return s.wheelbase >= 2.4; }, ok: function (s) { return 'Long car (' + s.wheelbase.toFixed(1) + ' m between wheels) – stays level over holes.'; }, bad: function () { return 'Short car: it will bounce and can fall into holes.'; } }
       ]
@@ -56,10 +44,23 @@
         { test: function (s) { return s.frontWeight >= 0.4; }, ok: function () { return 'Weight is not too far back – no flipping backwards.'; }, bad: function (s) { return 'Most weight is at the back (' + Math.round((1 - s.frontWeight) * 100) + '%). Move heavy parts forward.'; } }
       ]
     },
+    roller: {
+      caveats: [
+        'Going UP a hill turns speed into height; going DOWN turns it back into speed.',
+        'To get over a 9 m hill you need about √(2·g·h) ≈ 13 m/s (48 km/h) at the bottom – or a strong engine.',
+        'Fast over a hill top = airtime! Soft, long suspension makes the landings smooth.',
+        'Heavy bricks low and in the middle stop the car from flipping on landing.'
+      ],
+      checks: [
+        { test: function (s) { return s.powerPerKg >= 80; }, ok: function (s) { return Math.round(s.powerPerKg) + ' W per kg – strong enough for the big hills.'; }, bad: function (s) { return 'Only ' + Math.round(s.powerPerKg) + ' W per kg – you may roll back on the 9 m hill.'; } },
+        { test: function (s) { return s.travel >= 0.15; }, ok: function () { return 'Suspension can soak up the landings.'; }, bad: function () { return 'Very short suspension – landings will bounce you around.'; } },
+        { test: function (s) { return s.frontWeight > 0.3 && s.frontWeight < 0.7; }, ok: function () { return 'Weight is balanced – flies level.'; }, bad: function () { return 'Weight is all at one end – the car will nose-dive or flip in the air.'; } }
+      ]
+    },
     jump: {
       caveats: [
-        'You need about 60 km/h at the top of the ramp to fly across.',
-        'Driving up the ramp steals speed (gravity again!), so arrive at the ramp as fast as you can.',
+        'You need about 60 km/h at the top of the ramp to fly over the sharks.',
+        'Driving up the ramp steals speed (gravity again!) – use the booster and keep the gas pressed.',
         'Balanced weight (middle of the car) keeps it flying level. Soft suspension helps the landing.'
       ],
       checks: [
@@ -68,17 +69,30 @@
         { test: function (s) { return s.travel >= 0.15; }, ok: function () { return 'Suspension can soak up the landing.'; }, bad: function () { return 'Very stiff, short suspension – hard landing!'; } }
       ]
     },
-    eight: {
+    volcano: {
       caveats: [
-        'Turning pull = v² ÷ r. Twice the speed needs FOUR times the pull!',
-        'Tall + narrow cars tip over. Low + wide cars slide instead – sliding only loses time.',
-        'Spoilers push the car down so the tyres can pull harder in fast corners.',
-        'Look at the crossing: slow down or speed up so you do not meet the other car.'
+        'Boosters push you extra hard: more force = bigger speed increment.',
+        'The second lava river is 16 m wide – hit it at 65+ km/h.',
+        'After the jumps comes a 16° climb on rough rock – knobbly tyres and power per kg matter.',
+        'Lots of wheels share the landing bump – a long car with wheels far apart lands flatter.'
       ],
       checks: [
-        { test: function (s) { return s.tipLimitG > s.gripRoad; }, ok: function (s) { return 'Tip-over limit ' + s.tipLimitG.toFixed(2) + ' g is above grip ' + s.gripRoad + ' g: you would slide, not tip.'; }, bad: function (s) { return 'Tip-over limit ' + s.tipLimitG.toFixed(2) + ' g is below grip ' + s.gripRoad + ' g: you will TIP OVER first! Go lower or wider.'; } },
-        { test: function (s) { return s.hCoM <= 0.8; }, ok: function (s) { return 'Centre of mass is low (' + s.hCoM.toFixed(2) + ' m).'; }, bad: function (s) { return 'Centre of mass is high (' + s.hCoM.toFixed(2) + ' m). Put heavy parts at the bottom.'; } },
-        { test: function (s) { return s.width >= 1.8; }, ok: function () { return 'Wide axles – harder to tip.'; }, bad: function () { return 'Narrow axles tip easily in corners.'; } }
+        { test: function (s) { return s.powerPerKg >= 100; }, ok: function (s) { return Math.round(s.powerPerKg) + ' W per kg – enough for the jumps.'; }, bad: function (s) { return 'Only ' + Math.round(s.powerPerKg) + ' W per kg – add an engine or use lighter bricks.'; } },
+        { test: function (s) { return s.grip.rough >= 0.9; }, ok: function () { return 'Knobbly tyres grip the volcano rock.'; }, bad: function () { return 'Slick tyres slip on rough rock. Try knobbly tyres.'; } },
+        { test: function (s) { return s.wheelbase >= 2.4; }, ok: function (s) { return 'Wheels ' + s.wheelbase.toFixed(1) + ' m apart – stable landings.'; }, bad: function () { return 'Wheels close together – the car may flip when it lands.'; } }
+      ]
+    },
+    mega: {
+      caveats: [
+        'You start 30 m up. Gravity gives every car about 87 km/h at the bottom – heavy or light!',
+        'Air drag slows tall, boxy cars. A wedge nose and a low body keep more speed.',
+        'The kicker is steep: the car will spin in the air if the weight is at one end.',
+        'Try a FLIP: weight at the back makes the nose go up in the air.'
+      ],
+      checks: [
+        { test: function (s) { return s.cd <= 0.32; }, ok: function () { return 'Pointy shape – the air slides past.'; }, bad: function () { return 'Boxy shape – add a wedge nose (◣) at the front to cut the air.'; } },
+        { test: function (s) { return s.frontWeight > 0.3 && s.frontWeight < 0.7; }, ok: function () { return 'Balanced – it will fly level.'; }, bad: function () { return 'Weight at one end – expect a flip!'; } },
+        { test: function (s) { return s.travel >= 0.15; }, ok: function () { return 'Suspension ready for a big landing.'; }, bad: function () { return 'Short suspension – the landing will be hard.'; } }
       ]
     }
   };

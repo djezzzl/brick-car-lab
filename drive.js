@@ -5,6 +5,7 @@
   B.Drive = function (root, opts) {
     this.root = root;
     this.onExit = opts.onExit;
+    this.onRecords = opts.onRecords;
     this.canvas = root.querySelector('#drive-canvas');
     this.ctx = this.canvas.getContext('2d');
     var self0 = this;
@@ -26,12 +27,10 @@
     this.design = JSON.parse(JSON.stringify(design));
     this.stats = B.computeStats(this.design);
     this.track = track;
-    if (track.kind === 'side') {
-      if (!track.ground) track.ground = track.build();
-      this.sim = new B.SideSim(this.stats, track);
-    } else {
-      this.sim = new B.EightSim(this.stats);
-    }
+    if (!track.ground) track.ground = track.build();
+    this.sim = new B.SideSim(this.stats, track);
+    this.popups = [];
+    this.seenEvents = 0;
     this.run = B.newRun();
     this.result = null;
     this.acc = 0;
@@ -98,6 +97,7 @@
     this.root.querySelector('#res-retry').addEventListener('click', function () { self.restart(); });
     this.root.querySelector('#res-garage').addEventListener('click', function () { self.exit('garage'); });
     this.root.querySelector('#res-tracks').addEventListener('click', function () { self.exit('tracks'); });
+    this.root.querySelector('#res-records').addEventListener('click', function () { if (self.onRecords) self.onRecords(self.track); });
   };
 
   P.exit = function (where) { this.stop(); this.onExit(where, this.track); };
@@ -130,12 +130,12 @@
   P.tick = function (dt) {
     var run = this.run, sim = this.sim;
     if (!run.started && this.input.gas) { run.started = true; this.root.querySelector('#hint-start').hidden = true; }
-    if (!run.started && this.track.kind === 'top') return;
     var input = run.started ? this.input : { gas: false, brake: false };
     sim.step(dt, input);
     if (!run.started) return;
     B.updateRun(run, sim, dt);
     if (!run.history.length || run.time - run.history[run.history.length - 1].t > 0.1) run.history.push({ t: run.time, v: sim.speed() });
+    while (this.seenEvents < run.events.length) this.popups.push({ text: run.events[this.seenEvents++].text, born: performance.now() });
     var res = this.track.check(sim, run);
     if (res) this.finish(res);
   };
@@ -150,25 +150,46 @@
     el.querySelector('.why').textContent = B.explain(res.why, this.stats, this.run);
     var tips = B.evaluateTips(this.track.id, this.stats).checks.filter(function (c) { return !c.ok; });
     el.querySelector('.fix').innerHTML = !res.win && tips.length ? '<b>Ideas for your next car:</b><ul>' + tips.map(function (t) { return '<li>' + t.text + '</li>'; }).join('') + '</ul>' : '';
+    var rec = el.querySelector('.record');
+    rec.textContent = '';
     if (res.win) {
-      var best = B.load('bcl.stars', {});
-      best[this.track.id] = Math.max(best[this.track.id] || 0, res.stars);
-      B.save('bcl.stars', best);
+      var r = B.Records.add(this.track.id, this.design, this.stats, this.run, res.stars);
+      rec.textContent = r.rank === 1 ? '🏆 NEW TRACK RECORD! #1 of ' + r.total + ' runs' : '📜 Place #' + r.rank + ' of ' + r.total + ' in the record book';
+      if (r.rank === 1) this.popups.push({ text: '🏆 NEW RECORD!', born: performance.now() });
     }
   };
 
   P.draw = function () {
     var ctx = this.ctx, W = this.cssW || this.canvas.width, H = this.cssH || this.canvas.height, sim = this.sim;
     ctx.setTransform(this.dpr || 1, 0, 0, this.dpr || 1, 0, 0);
-    if (this.track.kind === 'top') { B.renderEight(ctx, W, H, sim, this.design, { arrows: this.arrows }); return; }
     var v = sim.speed();
-    var target = 58 / (1 + v / 35) * Math.min(1.2, 2.2 / Math.max(1.6, this.stats.height));
+    var target = 58 / (1 + v / 35) * Math.min(1.2, 2.2 / Math.max(1.6, this.stats.height)) * (sim.airborne ? 0.7 : 1);
     this.cam.scale += (target - this.cam.scale) * 0.05;
-    this.cam.x += (sim.x + sim.vx * 0.35 - this.cam.x) * 0.12;
-    this.cam.y += (sim.y - this.cam.y) * 0.08;
-    var opts = { arrows: this.arrows };
-    if (this.track.id === 'stop') opts.brakeX = sim.maxX() + v * v / (2 * Math.max(0.5, this.stats.brakeDecel));
-    B.renderSide(ctx, W, H, sim, this.track, this.design, this.cam, opts);
+    // Look a little ahead of the car, but never so far that the car leaves the screen.
+    var halfW = W / 2 / this.cam.scale, lead = Math.max(-halfW * 0.3, Math.min(halfW * 0.3, sim.vx * 0.25));
+    this.cam.x += (sim.x + lead - this.cam.x) * 0.2;
+    this.cam.x = Math.max(sim.x - halfW * 0.6, Math.min(sim.x + halfW * 0.6, this.cam.x));
+    this.cam.y += (sim.y - this.cam.y) * 0.12;
+    var halfH = H / 2 / this.cam.scale;
+    this.cam.y = Math.max(sim.y - halfH * 0.6, Math.min(sim.y + halfH * 0.6, this.cam.y));
+    B.renderSide(ctx, W, H, sim, this.track, this.design, this.cam, { arrows: this.arrows });
+    this.drawPopups(ctx, W, H);
+  };
+
+  // Big cheerful text for flips, big air and records; floats up and fades out.
+  P.drawPopups = function (ctx, W, H) {
+    var now = performance.now();
+    this.popups = this.popups.filter(function (p) { return now - p.born < 1800; });
+    this.popups.forEach(function (p, i) {
+      var age = (now - p.born) / 1800;
+      ctx.globalAlpha = 1 - age * age;
+      ctx.font = '900 ' + Math.round(Math.min(48, W / 14)) + 'px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 7; ctx.strokeStyle = '#1b2a34'; ctx.fillStyle = '#f2cd37';
+      var y = H * 0.3 - age * 40 + i * 54;
+      ctx.strokeText(p.text, W / 2, y); ctx.fillText(p.text, W / 2, y);
+      ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+    });
   };
 
   function fmt(n, d) { return (n >= 0 ? '' : '−') + Math.abs(n).toFixed(d == null ? 1 : d); }
@@ -193,44 +214,33 @@
     lines.push('<div class="eq small">Air drag = ½·ρ·Cd·A·v² – double speed ➜ 4× air push!</div>');
 
     var extra = '';
-    if (t.id === 'stop') {
-      var d = v * v / (2 * Math.max(0.5, s.brakeDecel));
-      extra += '<div class="eq"><b>Brake distance</b> d = v² ÷ (2·a) = ' + v.toFixed(1) + '² ÷ (2 × ' + s.brakeDecel.toFixed(1) + ') = <b>' + d.toFixed(1) + ' m</b></div>';
-      extra += '<div class="eq">Momentum p = m·v = ' + Math.round(s.mass * v) + ' kg·m/s</div>';
-      if (run.lineSpeed != null) extra += '<div class="eq">Speed at the line: <b>' + Math.round(run.lineSpeed * 3.6) + ' km/h</b></div>';
-    } else if (t.id === 'hill' && sim.ground) {
+    if (sim.airborne) extra += '<div class="eq b">🎮 In the air: hold <b>BRAKE</b> to tip the nose down (stopping the wheels spins the car the other way!).</div>';
+    if (f.booster > 0) extra += '<div class="eq o"><b>⚡ BOOSTER!</b> Extra push ' + kN(f.booster) + ' ➜ a bigger speed increment.</div>';
+    if (t.id === 'hill') {
       var sl = sim.slope(sim.x), th = Math.atan(sl) * 180 / Math.PI, need = Math.abs(sl);
       extra += '<div class="eq">Slope θ = <b>' + th.toFixed(0) + '°</b></div>';
       extra += '<div class="eq">Gravity pull = m·g·sin θ = ' + kN(Math.abs(f.gravity)) + '</div>';
       extra += '<div class="eq">Grip needed tan θ = ' + need.toFixed(2) + ' · your grip ' + s.grip.dirt.toFixed(2) + (need > s.grip.dirt ? ' <b class="r">✗ slipping!</b>' : ' ✓') + '</div>';
       if (sim.wheelspin) extra += '<div class="eq r"><b>Wheelspin!</b> Engine pushes harder than the tyres can grip.</div>';
     } else if (t.id === 'bad') {
-      extra += '<div class="eq">Clearance ' + Math.round(s.clearance * 100) + ' cm · wheel radius ' + Math.round(s.wheelR * 100) + ' cm</div>';
+      extra += '<div class="eq">Clearance ' + Math.round(s.clearance * 100) + ' cm · wheels ' + Math.round(s.wheelRMin * 100) + '–' + Math.round(s.wheelR * 100) + ' cm radius</div>';
       extra += sim.scraping > 50 ? '<div class="eq r"><b>SCRAPING!</b> The floor of the car is rubbing the ground.</div>' : '<div class="eq g">Floor is clear of the ground.</div>';
-    } else if (t.id === 'jump') {
-      extra += sim.airborne ? '<div class="eq b"><b>✈ Flying! ' + run.airTime.toFixed(2) + ' s</b> – only gravity acts: falling 9.8 m/s faster each second.</div>' :
-        '<div class="eq">Last flight: ' + run.lastAir.toFixed(2) + ' s</div>';
     } else if (t.id === 'speed') {
       extra += '<div class="eq">Top speed ≈ ' + Math.round(s.topSpeed * 3.6) + ' km/h (push = air + rolling)</div>';
-    } else if (t.id === 'eight') {
-      var r = sim.k > 1e-4 ? 1 / sim.k : Infinity;
-      var slide = sim.slideLimit(), tip = sim.tipLimit();
-      extra += '<div class="eq">Lap <b>' + Math.min(sim.lap + 1, t.laps) + ' / ' + t.laps + '</b> · limit ' + t.timeLimit + ' s</div>';
-      extra += '<div class="eq"><b>Turn pull</b> a = v² ÷ r = ' + v.toFixed(1) + '² ÷ ' + (isFinite(r) ? r.toFixed(0) + ' m' : '∞') + ' = <b>' + sim.aLat.toFixed(1) + ' m/s²</b></div>';
-      extra += meter('Slide limit (grip)', sim.aLat / slide, slide);
-      extra += meter('Tip-over limit', sim.aLat / tip, tip);
-      if (sim.spinTime > 0) extra += '<div class="eq r"><b>SKIDDING!</b> Tyres could not pull hard enough.</div>';
-      if (sim.crossingDanger()) extra += '<div class="eq r"><b>⚠ The other car is coming to the crossing!</b> Slow down or speed up.</div>';
+    } else if (t.id === 'roller' || t.id === 'mega') {
+      var h = Math.max(0, sim.ground(sim.x)), pe = s.mass * B.G * h, ke = 0.5 * s.mass * v * v, tot = Math.max(1, pe + ke);
+      extra += '<div class="eq"><b>Energy swap</b> (height ⇄ speed)</div>';
+      extra += '<div class="energy"><i class="pe" style="width:' + Math.round(pe / tot * 100) + '%"></i><i class="ke" style="width:' + Math.round(ke / tot * 100) + '%"></i></div>';
+      extra += '<div class="eq small"><span class="b">■ height m·g·h = ' + Math.round(pe / 1000) + ' kJ</span> (h = ' + h.toFixed(1) + ' m) · <span class="r">■ speed ½·m·v² = ' + Math.round(ke / 1000) + ' kJ</span></div>';
+      if (t.id === 'mega' && h > 1) extra += '<div class="eq">Falling ' + h.toFixed(0) + ' m gives v = √(2·g·h) = ' + Math.round(Math.sqrt(2 * B.G * h) * 3.6) + ' km/h</div>';
+    }
+    if (t.gaps || t.id === 'roller' || t.id === 'mega') {
+      extra += sim.airborne ? '<div class="eq b"><b>✈ Flying! ' + run.airTime.toFixed(2) + ' s</b> – only gravity acts: falling 9.8 m/s faster each second.</div>' :
+        '<div class="eq">Last flight: ' + run.lastAir.toFixed(2) + ' s' + (run.flips ? ' · flips: ' + run.flips : '') + '</div>';
     }
     el.querySelector('#formulas').innerHTML = lines.join('') + extra;
     this.drawGraph();
   };
-
-  function meter(label, frac, limit) {
-    var pct = Math.min(100, Math.round(frac * 100));
-    var col = frac > 0.9 ? '#d93025' : frac > 0.7 ? '#f29900' : '#1e9e3a';
-    return '<div class="meter"><span>' + label + ' (' + limit.toFixed(1) + ' m/s²)</span><span class="bar"><i style="width:' + pct + '%;background:' + col + '"></i></span></div>';
-  }
 
   P.drawGraph = function () {
     var c = this.graph, ctx = this.gctx, W = c.width, H = c.height, h = this.run.history;

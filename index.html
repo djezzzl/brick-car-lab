@@ -22,14 +22,14 @@
     <section id="garage" class="screen">
       <div class="col-left">
         <div class="panel">
-          <h2>1. Pick a part</h2>
+          <h2>1. Pick a part <button id="btn-rotate" title="Turn the wedge">↻ Rotate</button></h2>
           <div id="palette"></div>
           <div class="row"><b>Colour:</b> <span id="colors"></span></div>
           <p id="tool-hint" class="hint"></p>
         </div>
         <div class="panel">
           <h2>2. Wheels &amp; suspension</h2>
-          <div class="optrow"><b>Wheels</b><span id="opt-wheel"></span></div>
+          <div class="optrow"><b>Wheels <small>pick a size, then tap under the car</small></b><span id="wheel-tools"></span></div>
           <div class="optrow"><b>Tyres</b><span id="opt-tyre"></span></div>
           <div class="optrow"><b>Suspension</b><span id="opt-lift"></span></div>
           <div class="optrow"><b>Axle width</b><span id="opt-width"></span></div>
@@ -38,12 +38,15 @@
 
       <div class="col-mid">
         <div class="panel">
-          <h2>3. Build! <small>Click to add · right-click or 🧽 to remove</small></h2>
+          <h2>3. Build! <small>Tap to add · 🧽 or right-click to remove</small></h2>
+          <div class="row"><b>Car name:</b> <input id="car-name" maxlength="24" autocomplete="off" placeholder="My car"></div>
           <canvas id="builder-canvas"></canvas>
           <div class="row">
             <b>Start from:</b>
             <button data-preset="sport">🏎️ Sport car</button>
+            <button data-preset="hotrod">🔥 Hot rod</button>
             <button data-preset="monster">🛻 Monster truck</button>
+            <button data-preset="truck">🚚 Six wheeler</button>
             <button data-preset="tower">🗼 Wobbly tower</button>
             <button id="btn-clear">🗑️ Empty</button>
           </div>
@@ -83,16 +86,18 @@
       <div class="drive-body">
         <div class="stage">
           <canvas id="drive-canvas" width="1000" height="520"></canvas>
-          <div id="hint-start" class="overlay-hint">Hold <b>GAS</b> to start!<br><small>BRAKE slows down · hold BRAKE when stopped to reverse · keys → ←</small></div>
+          <div id="hint-start" class="overlay-hint">Hold <b>GAS</b> to start!<br><small>BRAKE slows down · in the air BRAKE tips the nose down · keys → ←</small></div>
           <div id="result" class="result" hidden>
             <h2></h2>
             <div class="stars"></div>
             <p class="reason"></p>
+            <p class="record"></p>
             <p class="why"></p>
             <div class="fix"></div>
             <div class="row">
               <button id="res-retry" class="big">🔄 Try again</button>
               <button id="res-garage">🔧 Change my car</button>
+              <button id="res-records">📜 Record book</button>
               <button id="res-tracks">🏁 Other tracks</button>
             </div>
           </div>
@@ -116,12 +121,24 @@
     </section>
   </main>
 
+  <div id="records" class="modal" hidden>
+    <div class="modal-box">
+      <h2 id="records-title"></h2>
+      <p class="small">Every finished run is saved here (in this browser). Compare your cars – tap 🔧 to load one back into the garage.</p>
+      <div id="records-body"></div>
+      <div class="row">
+        <button id="records-close" class="big">Close</button>
+        <button id="records-clear">🗑️ Clear this track</button>
+      </div>
+    </div>
+  </div>
+
   <script src="parts.js"></script>
   <script src="car.js"></script>
   <script src="tracks.js"></script>
-  <script src="topdown.js"></script>
   <script src="tips.js"></script>
   <script src="physics.js"></script>
+  <script src="records.js"></script>
   <script src="render.js"></script>
   <script src="builder.js"></script>
   <script src="drive.js"></script>
